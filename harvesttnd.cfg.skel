@@ -1,0 +1,16 @@
+[harvester]
+serial=/dev/ttyTND1
+server=xxx.xxx.xxx.xxx
+port=8883
+user=user
+pass=pass
+clientname=Thnd
+
+[temp]
+name=Temp
+topic=sensors/thunder/temp
+
+[lightning]
+name=Lightning
+topic=sensors/thunder/lightning
+
