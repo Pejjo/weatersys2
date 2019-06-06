@@ -15,12 +15,13 @@ import logging.handlers
 import argparse
 import socket
 import sys
-
+#import traceback
 ### Configure logging
 
 # Defaults
 LOG_FILENAME = "/var/log/weathersys/pjohat.log"
 LOG_LEVEL = logging.INFO  # Could be e.g. "DEBUG" or "WARNING"
+#LOG_LEVEL = logging.DEBUG
 UDP_IP = "127.0.0.1"
 UDP_PORT = 5005
 
@@ -66,11 +67,23 @@ sys.stdout = MyLogger(logger, logging.INFO)
 # Replace stderr with logging to file at ERROR level
 sys.stderr = MyLogger(logger, logging.ERROR)
 
+#def log_except_hook(*exc_info):
+#    text = "".join(traceback.format_exception(*exc_info))
+ #   logger.critical("Unhandled exception: %s", text)
+
+#def except_hook(exctype, value, tb):
+#  logger.critical("Unhandled exception")
+#  logger.critical(exctype)
+#  logger.critical(value)
+#  logger.critical(tb)
+
+#sys.excepthook = except_hook
 
 ### End logging
 
 ### Display message
-
+#handler = logging.StreamHandler(stream=sys.stdout)
+#logger.addHandler(handler)
 
 def sendmsg(msg):
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # UDP
@@ -107,7 +120,7 @@ def mqlog(message,level):
    if level==0:
       sendmsg(message)
    else:
-      logger.log(level,message)
+      logger.log(level,message.rstrip())
 
 mqttc = mqttlib.mqttclass.MyMQTTClass(status_cb=mqled, log_cb=mqlog)
 
@@ -134,6 +147,7 @@ verbose=True
 # Helper functions
 
 def poll_npa():
+   logger.debug("Poll NPA")
    retval=npa.poll()
    cfg=retval['class']
    if config.has_section(cfg):
@@ -141,6 +155,7 @@ def poll_npa():
          if config.has_option(cfg,'topic_temp'):
             topic_temp=config.get(cfg, 'topic_temp')
             mqttc.publish_msg(topic_temp,retval['temp'])
+            logger.debug("Pub NPA")
          if config.has_option(cfg,'topic_baro'):
             topic_press=config.get(cfg, 'topic_baro')
             mqttc.publish_msg(topic_press,retval['pressure'])
@@ -175,11 +190,53 @@ def poll_sht():
       if verbose:
         print("Class {} is not configured".format(cfg))
 
+foundSensors ={}
+
 
 def poll_radio():
-   rxb,result=lora.poll()
+   rxb,retval=lora.poll()
    if rxb>0:
-      print(result," (",rxb," byte)")
+# ({'node': 1, 'reset': 'PORF', 'token': 'Z', 'class': 'lora', 'battery': 2.960429897410845}, 'LORA (', 13, ' byte)')
+# ({'node': 1, 'token': 'A', 'sensor': 0, 'class': 'lora', 'id': '10309fdc01080000'}, 'LORA (', 25, ' byte)')
+# ({'node': 1, 'temp': 13.5, 'token': 'B', 'sensor': 0, 'class': 'lora', 'cycle': 19}, 'LORA (', 15, ' byte)')
+     try:
+       print(retval,"LORA (",rxb," byte)")
+       node=retval['node']
+       cfg=retval['class']
+       tok=retval['token']
+       if 'reset' in retval:
+         logger.info("LORA Node " + str(node) + " last reset source: " + retval['reset'])
+       if config.has_section(cfg):
+         if 'battery' in retval:
+           logger.info("LORA Battery")
+           logger.info('topic_battery'+str(node))
+           if config.has_option(cfg,'topic_battery'+str(node)):
+             logger.info('topic_battery'+str(node))
+             topic_battery=config.get(cfg, 'topic_battery'+str(node))
+             mqttc.publish_msg(topic_battery,retval['battery'])
+         if 'sensor' in retval:
+           if retval['sensor'] in foundSensors:
+             if 'temp' in retval:
+               logger.info("LORA temp")
+               logger.info("LORA: " + str(retval['sensor']) + " Id: " + foundSensors[retval['sensor']] + ": " + str(retval['temp']))
+               if config.has_option(cfg,'topic_'+foundSensors[retval['sensor']]):
+                 topic_temp=config.get(cfg, 'topic_'+foundSensors[retval['sensor']])
+                 mqttc.publish_msg(topic_temp,retval['temp'])
+             elif 'id' in retval:
+               if foundSensors[retval['sensor']] == retval['id']:
+                 logger.info("LORA ID Match")
+               else:
+                 logger.warning("LORA New ID: "+ retval['id'])
+                 foundSensors[retval['sensor']] = retval['id']
+             else:
+                logger.info("LORA Unmatch: "+retval)
+           elif 'id' in retval:
+               logger.info("LORA got ID: "+ retval['id'])
+               foundSensors[retval['sensor']] = retval['id']
+
+     except Exception as e:
+       logger.exception("LORA exeption")
+
 
 def poll_cpu():
    retval=sysinfo.get_cpu_info()
@@ -203,7 +260,6 @@ def poll_ram():
    retval=sysinfo.get_ram_info()
 
    cfg=retval['class']
-   print(retval)
    if config.has_section(cfg):
       try:
          if config.has_option(cfg,'topic_ram_used'):
@@ -225,7 +281,6 @@ def poll_ram():
 def poll_dsk():
    retval=sysinfo.get_disk_info()
    cfg=retval['class']
-   print(retval)
    if config.has_section(cfg):
       try:
          if config.has_option(cfg,'topic_disk_used'):
@@ -249,11 +304,14 @@ def poll_dsk():
 schedule.every(30).seconds.do(poll_npa)
 schedule.every(30).seconds.do(poll_sht)
 schedule.every(1).hours.do(poll_cpu)
-schedule.every(1).hours.do(poll_ram)
-schedule.every(1).hours.do(poll_dsk)
+schedule.every(12).hours.do(poll_ram)
+schedule.every(12).hours.do(poll_dsk)
 
 mqttc.setup_security('/usr/local/harvest/cert/ca.crt', certfile='/usr/local/harvest/cert/wthr.crt', keyfile='/usr/local/harvest/cert/wthr.key', username='wthr', password='FsZ2HZq6chkQGkLnZQ')
 mqttc.setup_connection('194.218.40.18',8883,60)
+
+mqttc.loop_start()
+
 
 mqttc.publish_msg('topic','startup')
 
@@ -261,7 +319,11 @@ mqttc.publish_msg('topic','startup')
 # Main loop
 while True:
   # Periodic tasks
-  rc = mqttc.loop()
+#  rc = mqttc.loop()
+#  if rc != MQTT_ERR_SUCCESS:
+#    logger.error("MQTT ERR "+str(rc))
+
+
 
   schedule.run_pending()
 

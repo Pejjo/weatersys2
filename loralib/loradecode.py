@@ -4,7 +4,7 @@ import re
 
 matchstrs=[r'(A):([0-9A-Fa-f]{2})=([0-9A-Fa-f]{2}),([0-9A-Fa-f]{16})',
            r'(B):([0-9A-Fa-f]{2})=([0-9A-Fa-f]{2})([0-9A-Fa-f]{2}),(\d{4})',
-           r'(Y):([0-9A-Fa-f]{2})=([0-9A-Fa-f]{2}),([0-9A-Fa-f]{2})([0-9A-Fa-f]{2})',
+           r'(Y):([0-9A-Fa-f]{2})=([0-9A-Fa-f]{2}),([0-9A-Fa-f]{4})([0-9A-Fa-f]{2})',
            r'(Z):([0-9A-Fa-f]{2})=([0-9A-Fa-f]{2}),([0-9A-Fa-f]{4})']
 
 resetcause=['PORF','EXTRF','BORF','WDRF','PDIRF','SRF']

@@ -23,6 +23,50 @@ import time
 import sys
 import re
 import signal
+import logging
+import logging.handlers
+
+
+LOG_FILENAME = "/var/log/weathersys/lcddmn.log"
+LOG_LEVEL = logging.INFO  # Could be e.g. "DEBUG" or "WARNING"
+LOG_LEVEL = logging.DEBUG
+
+print("Logging to file "+LOG_FILENAME)
+
+# Configure logging to log to a file, making a new file at midnight and keeping the last 3 day's data
+# Give the logger a unique name (good practice)
+logger = logging.getLogger(__name__)
+# Set the log level to LOG_LEVEL
+logger.setLevel(LOG_LEVEL)
+# Make a handler that writes to a file, making a new file at midnight and keeping 3 backups
+handler = logging.handlers.TimedRotatingFileHandler(LOG_FILENAME, when="midnight", backupCount=3)
+# Format each log message like this
+formatter = logging.Formatter('%(asctime)s %(levelname)-8s %(message)s')
+# Attach the formatter to the handler
+handler.setFormatter(formatter)
+# Attach the handler to the logger
+logger.addHandler(handler)
+
+# Make a class we can use to capture stdout and sterr in the log
+class MyLogger(object):
+        def __init__(self, logger, level):
+                """Needs a logger and a logger level."""
+                self.logger = logger
+                self.level = level
+
+        def write(self, message):
+                # Only log if there is a message (not just a new line)
+                if message.rstrip() != "":
+                        self.logger.log(self.level, message.rstrip())
+
+# Replace stdout with logging to file at INFO level
+sys.stdout = MyLogger(logger, logging.INFO)
+# Replace stderr with logging to file at ERROR level
+sys.stderr = MyLogger(logger, logging.ERROR)
+
+
+### End logging
+
 
 messages = Queue()
 
@@ -141,6 +185,7 @@ signal.signal(signal.SIGTERM, stop)
 
 if __name__ == "__main__":
     try:
+        logger.info("lcddmn started")
 #        device = get_device()
 
         # rev.1 users set port=0
@@ -154,3 +199,5 @@ if __name__ == "__main__":
         main()
     except KeyboardInterrupt:
         pass
+    except Exception as e:
+        logging.exception("Lcddmn crash")
