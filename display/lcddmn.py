@@ -133,7 +133,7 @@ def main():
                     else:
                         auxline=msg
                 except:
-                    print("Error parsing message",sys.exc_info())
+                    logging.exception("MEssage")
 
             with canvas(device) as draw:
                 now = datetime.datetime.now()
@@ -168,7 +168,7 @@ def main():
                 except:
                     logtme=""
                     logmsg=""
-                    print("Error calculating logtime",sys.exc_info())
+                    logging.exception("syslog")
 
                 draw.text(((cx + margin), cy), today_time, fill="yellow")
                 draw.text(((cx + margin + scpos), cy+9), myip, fill="yellow")

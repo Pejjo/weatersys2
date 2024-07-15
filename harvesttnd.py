@@ -126,7 +126,7 @@ mqttc.on_publish = on_publish
 # the server to publish to, and corresponding port
 # the server to publish to, and corresponding port
 
-mqttc.tls_set('cert/ca.crt', certfile='cert/wthr.crt', keyfile='cert/wthr.key', cert_reqs=ssl.CERT_REQUIRED, tls_version=ssl.PROTOCOL_TLSv1, ciphers=None)
+mqttc.tls_set('/usr/local/harvest/cert/ca.crt', certfile='/usr/local/harvest/cert/wthr.crt', keyfile='/usr/local/harvest/cert/wthr.key', cert_reqs=ssl.CERT_REQUIRED, tls_version=ssl.PROTOCOL_TLSv1, ciphers=None)
 
 mqttc.tls_insecure_set(True)
 mqttc.username_pw_set(config.get("harvester", "user"), password=config.get("harvester", "pass"))
